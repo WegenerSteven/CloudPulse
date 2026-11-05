@@ -1,121 +1,101 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import { useEffect, useState } from 'react'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import './App.css'
+import { Header } from './components/layout/Header'
+import { Sidebar } from './components/layout/Sidebar'
+import { alerts as initialAlerts, servers as initialServers } from './data/mockData'
+import { useAppPreferences } from './hooks/useAppPreferences'
+import { AlertsPage } from './pages/AlertsPage'
+import { MonitoringPage } from './pages/MonitoringPage'
+import { NotFoundPage } from './pages/NotFoundPage'
+import { OverviewPage } from './pages/OverviewPage'
+import { ServerDetailsPage } from './pages/ServerDetailsPage'
+import { ServersPage } from './pages/ServersPage'
+import { ServicesPage } from './pages/ServicesPage'
+import { SettingsPage } from './pages/SettingsPage'
+import type { Alert } from './types'
+
+const alertStorageKey = 'cloudpulse-alerts'
+
+const getStoredAlerts = (): Alert[] => {
+  try {
+    const stored = localStorage.getItem(alertStorageKey)
+    return stored ? (JSON.parse(stored) as Alert[]) : initialAlerts
+  } catch {
+    return initialAlerts
+  }
+}
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [alerts, setAlerts] = useState<Alert[]>(() => getStoredAlerts())
+  const { theme, setTheme, refreshInterval, setRefreshInterval, notifications, setNotifications } =
+    useAppPreferences()
+  const [toast, setToast] = useState<string | null>(null)
+
+  useEffect(() => {
+    localStorage.setItem(alertStorageKey, JSON.stringify(alerts))
+  }, [alerts])
+
+  useEffect(() => {
+    if (!toast) return
+    const timeout = window.setTimeout(() => setToast(null), 1800)
+    return () => window.clearTimeout(timeout)
+  }, [toast])
+
+  const resolveAlert = (id: string) => {
+    setAlerts((current) => {
+      const next: Alert[] = current.map((alert) =>
+        alert.id === id && alert.status === 'active'
+          ? { ...alert, status: 'resolved', resolvedAt: new Date().toISOString() }
+          : alert,
+      )
+
+      const resolvedAlert = next.find((alert) => alert.id === id && alert.status === 'resolved')
+      if (resolvedAlert) {
+        setToast(`Resolved: ${resolvedAlert.title}`)
+      }
+
+      return next
+    })
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <BrowserRouter>
+      <div className="app-shell">
+        <Sidebar />
+        <div className="content-panel">
+          <Header theme={theme} setTheme={setTheme} activeAlerts={alerts.filter((alert) => alert.status === 'active').length} />
+          {toast ? <div className="floating-toast">{toast}</div> : null}
+          <main className="main-content">
+            <Routes>
+              <Route path="/" element={<OverviewPage servers={initialServers} alerts={alerts} />} />
+              <Route path="/servers" element={<ServersPage servers={initialServers} />} />
+              <Route path="/servers/:serverId" element={<ServerDetailsPage alerts={alerts} />} />
+              <Route path="/monitoring" element={<MonitoringPage />} />
+              <Route
+                path="/alerts"
+                element={<AlertsPage alerts={alerts} resolveAlert={resolveAlert} notifications={notifications} />}
+              />
+              <Route path="/services" element={<ServicesPage />} />
+              <Route
+                path="/settings"
+                element={
+                  <SettingsPage
+                    theme={theme}
+                    setTheme={setTheme}
+                    refreshInterval={refreshInterval}
+                    setRefreshInterval={setRefreshInterval}
+                    notifications={notifications}
+                    setNotifications={setNotifications}
+                  />
+                }
+              />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </main>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      </div>
+    </BrowserRouter>
   )
 }
 
